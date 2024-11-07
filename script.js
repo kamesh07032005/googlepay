@@ -14,9 +14,9 @@ const OriginatingPlatformEnum = {
 function getPlatformType() {
     const userAgent = navigator.userAgent.toLowerCase();
     if (userAgent.includes('android')) {
-        return OriginatingPlatformEnum.ANDROID;
+        return OriginatingPlatformEnum.ANDROID_APP;
     } else if (userAgent.includes('iphone') || userAgent.includes('ipad')) {
-        return OriginatingPlatformEnum.IOS;
+        return OriginatingPlatformEnum.IOS_APP;
     } else if (userAgent.includes('mac') || userAgent.includes('windows') || userAgent.includes('linux')) {
         return OriginatingPlatformEnum.DESKTOP;
     } else {
@@ -24,320 +24,10 @@ function getPlatformType() {
     }
 }
 
+// Initialize platform type for use in requests
+const originatingPlatform = getPlatformType();
 
-
-async function checkCanMakePayment(request) {
-    if (sessionStorage.hasOwnProperty(canMakePaymentCache)) {
-        return JSON.parse(sessionStorage[canMakePaymentCache]);
-    }
-
-    try {
-        const result = request.canMakePayment ? await request.canMakePayment() : true;
-
-        sessionStorage[canMakePaymentCache] = JSON.stringify(result);
-        return result;
-    } catch (err) {
-        console.log('Error calling canMakePayment: ' + err);
-        throw err;
-    }
-}
-
-function onBuyClicked() {
-    if (!window.PaymentRequest) {
-        console.log('Web payments are not supported in this browser.');
-        return;
-    }
-
-    const supportedInstruments = [
-        {
-            supportedMethods: ['https://tez.google.com/pay'],
-            data: {
-                pa: 'vaseegrahveda@kvb',
-                pn: 'Vaseegrah Veda',
-                tr: '1894ABCD',
-                url: 'https://google.com',
-                mc: '5799',
-                tn: 'Purchase in Merchant',
-                originatingPlatform: 'DESKTOP',
-            },
-        }
-    ];
-
-    const details = {
-        total: {
-            label: 'Total',
-            amount: {
-                currency: 'INR',
-                value: '1.01',
-            },
-        },
-        displayItems: [{
-            label: 'Original Amount',
-            amount: {
-                currency: 'INR',
-                value: '1.01',
-            },
-        }],
-    };
-
-    let request = null;
-    try {
-        request = new PaymentRequest(supportedInstruments, details);
-    } catch (e) {
-        console.log('Payment Request Error: ' + e.message);
-        return;
-    }
-    if (!request) {
-        console.log('Web payments are not supported in this browser.');
-        return;
-    }
-
-    checkCanMakePayment(request)
-        .then((result) => {
-            showPaymentUI(request, result);
-        })
-        .catch((err) => {
-            console.log('Error calling checkCanMakePayment: ' + err);
-        });
-}
-
-function showPaymentUI(request, canMakePayment) {
-    if (!canMakePayment) {
-        handleNotReadyToPay();
-        return;
-    }
-
-    let paymentTimeout = window.setTimeout(function () {
-        window.clearTimeout(paymentTimeout);
-        request.abort()
-            .then(function () {
-                console.log('Payment timed out after 20 minutes.');
-            })
-            .catch(function () {
-                console.log('Unable to abort, user is in the process of paying.');
-            });
-    }, 20 * 60 * 1000);
-
-    request.show()
-        .then(function (instrument) {
-            window.clearTimeout(paymentTimeout);
-            processResponse(instrument);
-        })
-        .catch(function (err) {
-            console.log(err);
-        });
-}
-
-function handleNotReadyToPay() {
-    alert('Google Pay is not ready to pay.');
-}
-
-function processResponse(instrument) {
-    var instrumentString = instrumentToJsonString(instrument);
-    console.log(instrumentString);
-
-    fetch('/buy', {
-        method: 'POST',
-        headers: new Headers({ 'Content-Type': 'application/json' }),
-        body: instrumentString,
-    })
-        .then(function (buyResult) {
-            if (buyResult.ok) {
-                return buyResult.json();
-            }
-            console.log('Error sending instrument to server.');
-        })
-        .then(function (buyResultJson) {
-            completePayment(instrument, buyResultJson.status, buyResultJson.message);
-        })
-        .catch(function (err) {
-            console.log('Unable to process payment. ' + err);
-        });
-}
-
-function completePayment(instrument, result, msg) {
-    instrument.complete(result)
-        .then(function () {
-            console.log('Payment succeeds.');
-            console.log(msg);
-        })
-        .catch(function (err) {
-            console.log(err);
-        });
-}
-
-function instrumentToJsonString(paymentResponse) {
-    var paymentResponseDictionary = {
-        methodName: paymentResponse.methodName,
-        details: paymentResponse.details,
-        shippingAddress: addressToJsonString(paymentResponse.shippingAddress),
-        shippingOption: paymentResponse.shippingOption,
-        payerName: paymentResponse.payerName,
-        payerPhone: paymentResponse.payerPhone,
-        payerEmail: paymentResponse.payerEmail,
-    };
-    return JSON.stringify(paymentResponseDictionary, undefined, 2);
-}
-
-// Insert the provided code snippet here
-
-// Begin provided code snippet
-async function checkCanMakePayment(request) {
-    if (sessionStorage.hasOwnProperty(canMakePaymentCache)) {
-        return JSON.parse(sessionStorage[canMakePaymentCache]);
-    }
-
-    try {
-        const result = request.canMakePayment ? await request.canMakePayment() : true;
-
-        sessionStorage[canMakePaymentCache] = JSON.stringify(result);
-        return result;
-    } catch (err) {
-        console.log('Error calling canMakePayment: ' + err);
-        throw err;
-    }
-}
-
-function onBuyClicked() {
-    if (!window.PaymentRequest) {
-        console.log('Web payments are not supported in this browser.');
-        return;
-    }
-
-    const supportedInstruments = [
-        {
-            supportedMethods: ['https://tez.google.com/pay'],
-            data: {
-                pa: 'vaseegrahveda@kvb',
-                pn: 'Vaseegrah Veda',
-                tr: '1894ABCD',
-                url: 'https://google.com',
-                mc: '5799',
-                tn: 'Purchase in Merchant',
-
-            },
-        }
-    ];
-
-    const details = {
-        total: {
-            label: 'Total',
-            amount: {
-                currency: 'INR',
-                value: '10.01',
-            },
-        },
-        displayItems: [{
-            label: 'Original Amount',
-            amount: {
-                currency: 'INR',
-                value: '10.01',
-            },
-        }],
-    };
-
-    let request = null;
-    try {
-        request = new PaymentRequest(supportedInstruments, details);
-    } catch (e) {
-        console.log('Payment Request Error: ' + e.message);
-        return;
-    }
-    if (!request) {
-        console.log('Web payments are not supported in this browser.');
-        return;
-    }
-
-    checkCanMakePayment(request)
-        .then((result) => {
-            showPaymentUI(request, result);
-        })
-        .catch((err) => {
-            console.log('Error calling checkCanMakePayment: ' + err);
-        });
-}
-
-function showPaymentUI(request, canMakePayment) {
-    if (!canMakePayment) {
-        handleNotReadyToPay();
-        return;
-    }
-
-    let paymentTimeout = window.setTimeout(function () {
-        window.clearTimeout(paymentTimeout);
-        request.abort()
-            .then(function () {
-                console.log('Payment timed out after 20 minutes.');
-            })
-            .catch(function () {
-                console.log('Unable to abort, user is in the process of paying.');
-            });
-    }, 20 * 60 * 1000);
-
-    request.show()
-        .then(function (instrument) {
-            window.clearTimeout(paymentTimeout);
-            processResponse(instrument);
-        })
-        .catch(function (err) {
-            console.log(err);
-        });
-}
-
-function handleNotReadyToPay() {
-    alert('Google Pay is not ready to pay.');
-}
-
-function processResponse(instrument) {
-    var instrumentString = instrumentToJsonString(instrument);
-    console.log(instrumentString);
-
-    fetch('/buy', {
-        method: 'POST',
-        headers: new Headers({ 'Content-Type': 'application/json' }),
-        body: instrumentString,
-    })
-        .then(function (buyResult) {
-            if (buyResult.ok) {
-                return buyResult.json();
-            }
-            console.log('Error sending instrument to server.');
-        })
-        .then(function (buyResultJson) {
-            completePayment(instrument, buyResultJson.status, buyResultJson.message);
-        })
-        .catch(function (err) {
-            console.log('Unable to process payment. ' + err);
-        });
-}
-
-function completePayment(instrument, result, msg) {
-    instrument.complete(result)
-        .then(function () {
-            console.log('Payment succeeds.');
-            console.log(msg);
-        })
-        .catch(function (err) {
-            console.log(err);
-        });
-}
-
-function instrumentToJsonString(paymentResponse) {
-    var paymentResponseDictionary = {
-        methodName: paymentResponse.methodName,
-        details: paymentResponse.details,
-        shippingAddress: addressToJsonString(paymentResponse.shippingAddress),
-        shippingOption: paymentResponse.shippingOption,
-        payerName: paymentResponse.payerName,
-        payerPhone: paymentResponse.payerPhone,
-        payerEmail: paymentResponse.payerEmail,
-    };
-    return JSON.stringify(paymentResponseDictionary, undefined, 2);
-}
-
-// Insert the provided code snippet here
-
-// Begin provided code snippet
+// Initiate Google Pay transaction using merchantPayment API
 async function initiateMerchantPayment() {
     const requestData = {
         "merchantInfo": {
@@ -396,15 +86,28 @@ async function initiateMerchantPayment() {
         "originatingPlatform": originatingPlatform // Set the originating platform
     };
 
-    fetch('https://apibankingone.icicibank.com/api/v1/upi2/PayToVPA', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-    })
-        .then(response => response.json())
-        .then(data => console.log(data))
-        .catch(error => console.error('Error:', error));
+    try {
+        const response = await fetch('https://nbupayments.googleapis.com/v1/merchantPayments:initiate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData),
+        });
+
+        const data = await response.json();
+        console.log('Payment initiation response:', data);
+    } catch (error) {
+        console.error('Error initiating payment:', error);
+    }
 }
-// End provided code snippet
+
+// Call initiateMerchantPayment function on button click
+function onBuyClicked() {
+    if (!window.PaymentRequest) {
+        console.log('Web payments are not supported in this browser.');
+        return;
+    }
+
+    initiateMerchantPayment();
+}
